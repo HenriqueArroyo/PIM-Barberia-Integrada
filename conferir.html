@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conferir Agendamentos - Barbearia</title>
+    <link rel="stylesheet" href="style.css"> 
+    <style>
+        /* Variáveis de cores e tipografia */
+        :root {
+            --primary-color: #1f2937; /* Cinza escuro/quase preto */
+            --bg-color: #f3f4f6; /* Fundo cinza bem claro */
+            --text-color: #374151; /* Texto principal */
+            --border-color: #e5e7eb; /* Bordas suaves */
+            --past-bg: #ecfdf5; /* Verde fraco para datas passadas */
+            --past-hover: #d1fae5; /* Verde fraco escurecido pro hover */
+            --past-text: #065f46; /* Texto verde escuro para contraste */
+        }
+
+        /* Reset básico e tipografia */
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        /* Cabeçalho Fixo (Sticky) no Topo */
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem 0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            position: absolute; /* Mantém no topo */
+            top: 0;
+            width: 100%;
+            z-index: 1000; /* Fica acima da tabela na rolagem */
+        }
+
+        header .container {
+            gap: 15px;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        /* Botão Voltar (Acessível) */
+        .btn-voltar {
+            color: white;
+            text-decoration: none;
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: 500;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.2s ease-in-out;
+        }
+
+        .btn-voltar:hover, .btn-voltar:focus {
+            background-color: rgba(255, 255, 255, 0.2);
+            outline: 2px solid white;
+            outline-offset: 2px;
+        }
+
+        /* Container centralizado */
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        main.container {
+            margin-top: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        /* Container da Tabela */
+        .table-wrapper {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        caption.sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        th, td {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: #f9fafb;
+            font-weight: 600;
+            color: var(--primary-color);
+            white-space: nowrap;
+        }
+
+        /* Efeito visual nas linhas comuns */
+        tbody tr:nth-child(even):not(.past-date) {
+            background-color: #f9fafb;
+        }
+
+        tbody tr:hover:not(.past-date) {
+            background-color: #f3f4f6;
+            transition: background-color 0.2s;
+        }
+
+        /* Estilização específica para agendamentos que JÁ PASSARAM */
+        tbody tr.past-date {
+            background-color: var(--past-bg);
+            color: var(--past-text);
+        }
+
+        tbody tr.past-date:hover {
+            background-color: var(--past-hover);
+            transition: background-color 0.2s;
+        }
+
+        /* Feedback visual */
+        .feedback-msg {
+            text-align: center;
+            padding: 30px;
+            color: #6b7280;
+            font-style: italic;
+        }
+
+        .error-msg {
+            color: #dc2626;
+            background-color: #fee2e2;
+            font-style: normal;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Agenda Geral</h1>
+            <a href="/" class="btn-voltar" aria-label="Voltar para a página inicial">Voltar ao Início</a>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="table-wrapper">
+            <table>
+                <caption class="sr-only">Lista de todos os agendamentos registrados no sistema</caption>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Cliente</th>
+                        <th>Serviço</th>
+                        <th>Data e Hora</th>
+                    </tr>
+                </thead>
+                <tbody id="tabela-corpo">
+                    <tr>
+                        <td colspan="4" class="feedback-msg" id="status-msg">Carregando agendamentos...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        // Função para formatar a data de "YYYY-MM-DD HH:MM" para "DD/MM/YYYY às HH:MM"
+        function formatarDataHora(dataString) {
+            if (!dataString) return '-';
+            const partes = dataString.split(' ');
+            if (partes.length !== 2) return dataString;
+            
+            const dataPartes = partes[0].split('-');
+            const hora = partes[1];
+            
+            if (dataPartes.length === 3) {
+                return `${dataPartes[2]}/${dataPartes[1]}/${dataPartes[0]} às ${hora}`;
+            }
+            return dataString;
+        }
+
+        async function carregarAgendamentos() {
+            const corpo = document.getElementById('tabela-corpo');
+
+            try {
+                const response = await fetch('http://localhost:8000/lista-geral-agendamentos');
+                
+                if (!response.ok) throw new Error('Falha ao comunicar com o servidor.');
+                
+                const agendamentos = await response.json();
+
+                corpo.innerHTML = '';
+
+                if (agendamentos.length === 0) {
+                    corpo.innerHTML = `
+                        <tr>
+                            <td colspan="4" class="feedback-msg">Nenhum agendamento encontrado.</td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                const agora = new Date();
+                const futuros = [];
+                const passados = [];
+
+                // 1. Separar agendamentos entre futuros e passados
+                agendamentos.forEach(a => {
+                    // Substitui o espaço por 'T' para o JS ler corretamente (ex: "2026-05-11T10:00")
+                    const dataAgendamento = new Date(a.data_agendamento.replace(' ', 'T'));
+                    
+                    if (dataAgendamento < agora) {
+                        a.isPast = true;
+                        passados.push(a);
+                    } else {
+                        a.isPast = false;
+                        futuros.push(a);
+                    }
+                });
+
+                // Função auxiliar para ordenar da mais antiga para a mais nova
+                const ordenarAscendente = (a, b) => {
+                    const dataA = new Date(a.data_agendamento.replace(' ', 'T'));
+                    const dataB = new Date(b.data_agendamento.replace(' ', 'T'));
+                    return dataA - dataB;
+                };
+
+                // 2. Ordenar ambas as listas (mais antigas -> mais novas)
+                futuros.sort(ordenarAscendente);
+                passados.sort(ordenarAscendente);
+
+                // 3. Juntar as listas: Futuros primeiro, passados no final
+                const agendamentosOrdenados = [...futuros, ...passados];
+
+                // 4. Preencher a tabela
+                agendamentosOrdenados.forEach(a => {
+                    const dataFormatada = formatarDataHora(a.data_agendamento);
+                    // Aplica a classe 'past-date' se for passado
+                    const classeLinha = a.isPast ? 'class="past-date"' : '';
+                    
+                    corpo.innerHTML += `
+                        <tr ${classeLinha}>
+                            <td>#${a.id_agendamento}</td>
+                            <td><strong>${a.nome_cliente}</strong></td>
+                            <td>${a.nome_servico}</td>
+                            <td>${dataFormatada}</td>
+                        </tr>
+                    `;
+                });
+
+            } catch (error) {
+                console.error(error);
+                corpo.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="feedback-msg error-msg">Erro ao carregar os agendamentos. Tente novamente mais tarde.</td>
+                    </tr>
+                `;
+            }
+        }
+
+        window.onload = carregarAgendamentos;
+    </script>
+</body>
+</html>

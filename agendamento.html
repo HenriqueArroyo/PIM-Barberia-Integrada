@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="PT-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agendamento</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="responsive.css">
+    
+</head>
+<body>
+
+   
+   <!-- <selection class="contact-form">
+        <div class="imagem">
+        <div class="figura">
+             <figure>
+                <img src="assets/cranio.png" alt="Cranio de barbearia">
+            </figure>
+        </div>        
+    </div>
+-->
+
+    </selection>
+    <section class="contact-form">
+        <div class="container">
+            <h2>Agendamento</h2>
+            <div class="form">
+
+                <div class="item-form">
+                    <label for="nome">Nome</label>
+                    <input type="text" id="nome">
+                </div>
+
+                <div class="item-form">
+                    <label for="telefone">Telefone</label>
+                    <input type="text" id="telefone">
+                </div>
+
+                <div class="item-form">
+                    <label for="e-mail">E-mail</label>
+                    <input type="email" id="e-mail">
+                </div>
+
+                <div class="item-form">
+                    <label for="servicos">Serviços</label>
+                        <select id="servicos">
+                            <option value="">Selecione um serviço</option>
+                            <option>Degradê</option>
+                            <option>Social</option>
+                            <option>Infantil</option>
+                            <option>Barba</option>
+                            <option>Pezinho</option>
+                            <option>Combo (Cabelo + Barba)</option>
+                            <option>Pigmentação</option>
+                        </select>
+                </div>   
+                
+                <div class="item-form">
+                    <label for="calendario">Calendário</label>
+                    <input type="date" id="calendario">
+                </div>
+
+                <div class="item-form">
+                    <label for="hora">Hora</label>
+                    <select id ="hora">
+                        <option value="">selecione um horário</option>
+                        <option>7:00 - 8:00</option>
+                        <option>8:00 - 9:00</option>
+                        <option>9:00 - 10:00</option>
+                        <option>10:00 - 11:00</option>
+                        <option>11:00 - 12:00</option>
+                        <option>13:00 - 14:00</option>
+                        <option>14:00 - 15:00</option>
+                        <option>15:00 - 16:00</option>
+                        <option>16:00 - 17:00</option>
+                        <option>17:00 - 18:00</option>
+                        <option>18:00 - 19:00</option>
+                    </select>
+                </div>
+
+
+                <div class="form-buttons">
+                    <button class="btn">Próximo</button>
+                </div>
+            </div>
+        </div>
+
+   
+    </section>
+    
+</body>
+<script>
+        // Defina a URL base da sua API (onde o Uvicorn está rodando)
+        const API_URL = 'http://localhost:8000';
+
+        // Elementos do DOM
+        const selectServicos = document.getElementById('servicos');
+        const inputCalendario = document.getElementById('calendario');
+        const selectHora = document.getElementById('hora');
+        const btnAgendar = document.querySelector('.btn');
+
+        // 1. Carregar Serviços do Banco de Dados
+        async function carregarServicos() {
+            try {
+                const response = await fetch(`${API_URL}/servicos`);
+                const data = await response.json();
+                
+                selectServicos.innerHTML = '<option value="">Selecione um serviço</option>';
+                data.servicos.forEach(servico => {
+                    // Colocamos o id_servico no value para enviar no POST depois
+                    selectServicos.innerHTML += `<option value="${servico.id_servico}">${servico.nome} - R$ ${servico.preco.toFixed(2)}</option>`;
+                });
+            } catch (error) {
+                console.error('Erro ao buscar serviços:', error);
+            }
+        }
+
+        // 2. Buscar horários disponíveis ao selecionar a data
+        inputCalendario.addEventListener('change', async (e) => {
+            const dataEscolhida = e.target.value;
+            if (!dataEscolhida) return;
+
+         try {
+                const response = await fetch(`${API_URL}/horarios-disponiveis?data=${dataEscolhida}`);
+                const data = await response.json();
+                
+                // Limpa e reseta o seletor de hora
+                selectHora.innerHTML = '<option value="">Selecione um horário</option>';
+                
+                if (data.horarios_livres.length === 0) {
+                    selectHora.innerHTML = '<option value="">Nenhum horário vago</option>';
+                } else {
+                    data.horarios_livres.forEach(hora => {
+                        selectHora.innerHTML += `<option value="${hora}">${hora}</option>`;
+                    });
+                }
+            } catch (error) {
+                console.error('Erro ao buscar horários:', error);
+            }
+        });
+
+        // 3. Enviar o formulário
+        btnAgendar.addEventListener('click', async (e) => {
+            e.preventDefault(); // Evita que o botão recarregue a página
+
+            const nome = document.getElementById('nome').value;
+            const telefone = document.getElementById('telefone').value;
+            const email = document.getElementById('e-mail').value;
+            const id_servico = parseInt(selectServicos.value);
+            const data = inputCalendario.value;
+            const hora = selectHora.value;
+
+            // Validação básica
+            if (!nome || !telefone || !email || !id_servico || !data || !hora) {
+                alert('Por favor, preencha todos os campos!');
+                return;
+            }
+
+            // O backend valida o length da string para >= 16 ("YYYY-MM-DD HH:MM")
+            const data_agendamento = `${data} ${hora}`;
+
+            // Objeto que reflete o modelo AgendamentoRequest do Pydantic
+            const payload = {
+                nome_cliente: nome,
+                email_cliente: email,
+                telefone_cliente: telefone,
+                id_servico: id_servico,
+                data_agendamento: data_agendamento
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/agendar`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert('Agendamento confirmado com sucesso!');
+                    window.location.href = 'index.html';
+                } else {
+                    // Exibe o erro retornado pelo FastAPI (HTTPException)
+                    alert(`Erro: ${result.detail}`);
+                }
+            } catch (error) {
+                console.error('Erro ao agendar:', error);
+                alert('Falha ao se comunicar com o servidor.');
+            }
+        });
+
+        // Inicializa buscando os serviços assim que a página abrir
+        window.onload = carregarServicos;
+    </script>
+</html>
